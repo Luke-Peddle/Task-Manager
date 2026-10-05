@@ -19,6 +19,12 @@ export function formatRelative(value: string, now = Date.now()): string {
   return relativeFormatter.format(days, "day");
 }
 
+export function dateInputToIso(value: string): string | null {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59).toISOString();
+}
+
 export function getTaskStatus(dueDate: string | null, now = Date.now()): TaskStatus {
   if (!dueDate) return "no-date";
   const diff = new Date(dueDate).getTime() - now;
