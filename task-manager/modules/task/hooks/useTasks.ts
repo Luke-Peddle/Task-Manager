@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -6,12 +7,11 @@ import {
 } from "@tanstack/react-query";
 import type { Result } from "@/types/Result";
 import { createTask, type CreateTaskPayload } from "../mutation/createTask";
-import {
-  QUERY_KEY as DEADLINE_TASKS_KEY,
-  getDeadlineTasksOptions,
-} from "../queries/getDeadlineTasks";
-import { QUERY_KEY as TASK_STATS_KEY, getTaskStatsOptions } from "../queries/getTaskStats";
-import { QUERY_KEY as TASKS_KEY, getTasksOptions } from "../queries/getTasks";
+import { updateStep, type UpdateStepPayload } from "../mutation/updateStep";
+import { updateTask, type UpdateTaskPayload } from "../mutation/updateTask";
+import { QUERY_KEY as CALENDAR_KEY, getCalendarOptions } from "../queries/getCalendar";
+import { QUERY_KEY as TIMELINE_KEY, getTimelineOptions } from "../queries/getTimeline";
+import type { CompletableTask } from "@/types/task";
 
 function fromResult<T>(result: Result<T> | undefined) {
   if (!result) return { data: undefined, error: null };
@@ -19,45 +19,41 @@ function fromResult<T>(result: Result<T> | undefined) {
   return { data: result.data, error: null };
 }
 
-export function useTasks(page: number, limit: number) {
-  const query = useQuery({ ...getTasksOptions(page, limit), placeholderData: keepPreviousData });
+function useInvalidateTasks() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: [TIMELINE_KEY] }),
+      queryClient.invalidateQueries({ queryKey: [CALENDAR_KEY] }),
+    ]);
+}
+
+export function useTimeline() {
+  const query = useQuery(getTimelineOptions());
   const { data, error } = fromResult(query.data);
-  const total = data?.total ?? 0;
 
   return {
-    tasks: data?.data ?? [],
-    total,
-    totalPages: Math.max(1, Math.ceil(total / limit)),
+    tasks: data ?? [],
     hasData: data !== undefined,
-    loading: query.isFetching,
+    loading: query.isPending,
     error,
   };
 }
 
-export function useTaskStats() {
-  const query = useQuery(getTaskStatsOptions());
-  const { data, error } = fromResult(query.data);
-
-  return { data: data ?? null, loading: query.isPending, error };
-}
-
-export function useDeadlineTasks(kind: "upcoming" | "overdue", limit = 5) {
-  const query = useQuery(getDeadlineTasksOptions(kind, limit));
+export function useCalendar(from: string, to: string) {
+  const query = useQuery({ ...getCalendarOptions(from, to), placeholderData: keepPreviousData });
   const { data, error } = fromResult(query.data);
 
   return { data: data ?? null, loading: query.isPending, error };
 }
 
 export function useCreateTask() {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidateTasks();
 
   const mutation = useMutation({
     mutationFn: (payload: CreateTaskPayload) => createTask(payload),
     onSuccess: (result) => {
-      if (result.error !== null) return;
-      queryClient.invalidateQueries({ queryKey: [TASKS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [TASK_STATS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [DEADLINE_TASKS_KEY] });
+      if (result.error === null) return invalidate();
     },
   });
 
@@ -71,3 +67,60 @@ export function useCreateTask() {
     resetError: mutation.reset,
   };
 }
+
+export function useUpdateStep() {
+  const invalidate = useInvalidateTasks();
+
+  const mutation = useMutation({
+    mutationFn: (payload: UpdateStepPayload) => updateStep(payload),
+    onSettled: () => invalidate(),
+  });
+
+  const pending = mutation.isPending ? mutation.variables : undefined;
+
+  return {
+    toggleStep: (stepId: number, completed: boolean) => mutation.mutate({ stepId, completed }),
+    isChecked: (step: { id: number; completed: boolean }) =>
+      pending?.stepId === step.id ? pending.completed : step.completed,
+    error: fromResult(mutation.data).error,
+  };
+}
+
+export function useTaskCompletion() {
+  const invalidate = useInvalidateTasks();
+  const [confirming, setConfirming] = useState<CompletableTask | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (payload: UpdateTaskPayload) => updateTask(payload),
+    onSettled: () => invalidate(),
+  });
+
+  const pending = mutation.isPending ? mutation.variables : undefined;
+
+  function toggle(task: CompletableTask, checked: boolean) {
+    if (checked && task.steps.some((step) => !step.completed)) {
+      setConfirming(task);
+      return;
+    }
+    mutation.mutate({ taskId: task.id, completed: checked });
+  }
+
+  function confirm(completeSteps: boolean) {
+    if (!confirming) return;
+    mutation.mutate({ taskId: confirming.id, completed: true, completeSteps });
+    setConfirming(null);
+  }
+
+  return {
+    toggle,
+    confirm,
+    cancel: () => setConfirming(null),
+    confirming,
+    isChecked: (task: { id: number; completed: boolean }) =>
+      pending?.taskId === task.id ? pending.completed : task.completed,
+    error: fromResult(mutation.data).error,
+  };
+}
+
+export type StepToggle = ReturnType<typeof useUpdateStep>;
+export type TaskCompletion = ReturnType<typeof useTaskCompletion>;
