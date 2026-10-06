@@ -1,28 +1,25 @@
-import { OverviewStatsCards } from "@/modules/task/componets/Cards/OverviewCard";
-import { DeadlineCard } from "@/modules/task/componets/Cards/DeadlineCards";
-import {TasksCard} from "@/modules/task/componets/Cards/TasksCard";
+import { AddTask } from "@/modules/task/componets/AddTask";
+import { TaskCalendar } from "@/modules/task/componets/TaskCalendar";
+import { UpcomingList } from "@/modules/task/componets/UpcomingList";
 
 export default function DashboardPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          What&apos;s due, what&apos;s late, and everything else on your list.
-        </p>
+    <div className="mx-auto max-w-360 space-y-6 px-4 py-8 md:px-8 md:py-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-muted-foreground">
+            What&apos;s due, what&apos;s next, and what you&apos;ve finished.
+          </p>
+        </div>
+        <AddTask />
       </header>
 
-      <OverviewStatsCards />
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <TasksCard />
-        </div>
-
-        <div className="space-y-5">
-          <DeadlineCard variant="upcoming" />
-          <DeadlineCard variant="overdue" />
-        </div>
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <TaskCalendar />
+        <aside className="xl:sticky xl:top-6">
+          <UpcomingList />
+        </aside>
       </div>
     </div>
   );

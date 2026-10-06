@@ -18,9 +18,7 @@ next-env.d.ts
 
 # Environment variables
 .env
-.env*.local
-.env.development
-.env.production
+.env.*
 !.env.example
 
 # SQLite database
@@ -29,9 +27,7 @@ next-env.d.ts
 *.db-wal
 *.db-shm
 
-# Prisma (temporary, until it moves into the API app)
-/prisma/
-/prisma7.config.ts
+# Generated Prisma client
 **/generated/prisma/
 
 # AI tool settings
