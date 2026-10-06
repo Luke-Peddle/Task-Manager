@@ -8,27 +8,8 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-
-const trim = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.trim() : value;
-
-export class CreateStepDto {
-  @Transform(trim)
-  @IsString()
-  @IsNotEmpty({ message: 'Each step needs a name' })
-  @MaxLength(200)
-  name!: string;
-
-  @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @MaxLength(2000)
-  description?: string | null;
-
-  @IsOptional()
-  @IsDateString({}, { message: 'Step due date must be a valid date' })
-  dueDate?: string | null;
-}
+import { trim } from '../../common/utils.js';
+import { CreateStepDto } from '../../steps/dto/create-step.dto.js';
 
 export class CreateTaskDto {
   @Transform(trim)

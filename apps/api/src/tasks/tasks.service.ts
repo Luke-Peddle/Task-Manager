@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ifProvided, toDate } from '../common/utils.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { STEP_ORDER, stepData } from '../steps/utils/steps.helpers.js';
 import { CreateTaskDto } from './dto/create-task.dto.js';
 import { UpdateTaskDto } from './dto/update-task.dto.js';
 
-const toDate = (value?: string | null) => (value ? new Date(value) : null);
-
-const STEP_ORDER = [{ dueDate: { sort: 'asc' as const, nulls: 'last' as const } }, { id: 'asc' as const }];
+const WITH_STEPS = { steps: { orderBy: STEP_ORDER } };
 
 @Injectable()
 export class TasksService {
@@ -14,7 +14,7 @@ export class TasksService {
   findTimeline() {
     return this.prisma.task.findMany({
       orderBy: [{ dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
-      include: { steps: { orderBy: STEP_ORDER } },
+      include: WITH_STEPS,
     });
   }
 
@@ -23,13 +23,7 @@ export class TasksService {
       this.prisma.task.findMany({
         where: { dueDate: { gte: from, lt: to } },
         orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
-        select: {
-          id: true,
-          name: true,
-          dueDate: true,
-          completed: true,
-          steps: { orderBy: STEP_ORDER, select: { id: true, name: true, completed: true } },
-        },
+        include: WITH_STEPS,
       }),
       this.prisma.step.findMany({
         where: { dueDate: { gte: from, lt: to } },
@@ -42,53 +36,65 @@ export class TasksService {
   }
 
   create(dto: CreateTaskDto) {
-    const steps = dto.steps ?? [];
-
     return this.prisma.task.create({
       data: {
         name: dto.name,
         description: dto.description || null,
         dueDate: toDate(dto.dueDate),
-        steps: {
-          create: steps.map((step) => ({
-            name: step.name,
-            description: step.description || null,
-            dueDate: toDate(step.dueDate),
-          })),
-        },
+        steps: { create: (dto.steps ?? []).map(stepData) },
       },
-      include: { steps: { orderBy: STEP_ORDER } },
+      include: WITH_STEPS,
     });
   }
 
-  async updateTask(id: number, dto: UpdateTaskDto) {
-    const task = await this.prisma.task.findUnique({ where: { id } });
+  async update(id: number, dto: UpdateTaskDto) {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: { steps: { select: { id: true } } },
+    });
     if (!task) throw new NotFoundException(`Task ${id} doesn't exist.`);
 
-    const updateTask = this.prisma.task.update({
-      where: { id },
-      data: { completed: dto.completed },
-      include: { steps: { orderBy: STEP_ORDER } },
-    });
-
-    if (dto.completed && dto.completeSteps) {
-      const [, updated] = await this.prisma.$transaction([
-        this.prisma.step.updateMany({
-          where: { taskId: id, completed: false },
-          data: { completed: true },
-        }),
-        updateTask,
-      ]);
-      return updated;
+    if (dto.steps) {
+      const ownIds = new Set(task.steps.map((step) => step.id));
+      const foreignIds = dto.steps.flatMap((step) =>
+        step.id !== undefined && !ownIds.has(step.id) ? [step.id] : [],
+      );
+      if (foreignIds.length > 0) {
+        throw new BadRequestException(`Steps ${foreignIds.join(', ')} don't belong to this task.`);
+      }
     }
 
-    return updateTask;
-  }
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.steps) {
+        const keptIds = dto.steps.flatMap((step) => (step.id !== undefined ? [step.id] : []));
+        await tx.step.deleteMany({ where: { taskId: id, id: { notIn: keptIds } } });
 
-  async updateStep(id: number, completed: boolean) {
-    const step = await this.prisma.step.findUnique({ where: { id } });
-    if (!step) throw new NotFoundException(`Step ${id} doesn't exist.`);
+        for (const step of dto.steps) {
+          if (step.id !== undefined) {
+            await tx.step.update({ where: { id: step.id }, data: stepData(step) });
+          } else {
+            await tx.step.create({ data: { ...stepData(step), taskId: id } });
+          }
+        }
+      }
 
-    return this.prisma.step.update({ where: { id }, data: { completed } });
+      if (dto.completed && dto.completeSteps) {
+        await tx.step.updateMany({
+          where: { taskId: id, completed: false },
+          data: { completed: true },
+        });
+      }
+
+      return tx.task.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          description: ifProvided(dto.description, (value) => value || null),
+          dueDate: ifProvided(dto.dueDate, toDate),
+          completed: dto.completed,
+        },
+        include: WITH_STEPS,
+      });
+    });
   }
 }
