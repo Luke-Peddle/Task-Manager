@@ -115,9 +115,20 @@ const tasks = [
 
 async function main() {
   await prisma.task.deleteMany();
+  const now = Date.now();
 
   for (const { steps, ...task } of tasks) {
-    await prisma.task.create({ data: { ...task, steps: { create: steps } } });
+    const isPast = (date: Date | null) => date !== null && date.getTime() < now;
+
+    await prisma.task.create({
+      data: {
+        ...task,
+        completed: steps.length > 0 && steps.every((step) => isPast(step.dueDate)),
+        steps: {
+          create: steps.map((step) => ({ ...step, completed: isPast(step.dueDate) })),
+        },
+      },
+    });
   }
 
   console.log(`Seeded ${tasks.length} tasks.`);

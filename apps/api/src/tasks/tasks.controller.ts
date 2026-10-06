@@ -1,47 +1,57 @@
 import {
+  BadRequestException,
   Body,
   Controller,
-  DefaultValuePipe,
   Get,
+  Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto.js';
+import { UpdateStepDto } from './dto/update-step.dto.js';
+import { UpdateTaskDto } from './dto/update-task.dto.js';
 import { TasksService } from './tasks.service.js';
 
-const MAX_LIMIT = 100;
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const MAX_CALENDAR_RANGE_MS = 100 * 86_400_000;
 
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
-  @Get()
-  findAll(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-  ) {
-    return this.tasksService.findPaginated(Math.max(page, 1), clamp(limit, 1, MAX_LIMIT));
+  @Get('timeline')
+  timeline() {
+    return this.tasksService.findTimeline();
   }
 
-  @Get('stats')
-  stats() {
-    return this.tasksService.getStats();
-  }
+  @Get('calendar')
+  calendar(@Query('from') from?: string, @Query('to') to?: string) {
+    const start = new Date(from ?? '');
+    const end = new Date(to ?? '');
 
-  @Get('upcoming')
-  upcoming(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
-    return this.tasksService.findUpcoming(clamp(limit, 1, MAX_LIMIT));
-  }
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+      throw new BadRequestException('Provide valid "from" and "to" dates, with "from" before "to".');
+    }
+    if (end.getTime() - start.getTime() > MAX_CALENDAR_RANGE_MS) {
+      throw new BadRequestException('The date range can be at most 100 days.');
+    }
 
-  @Get('overdue')
-  overdue(@Query('limit', new DefaultValuePipe(5), ParseIntPipe) limit: number) {
-    return this.tasksService.findOverdue(clamp(limit, 1, MAX_LIMIT));
+    return this.tasksService.findCalendar(start, end);
   }
 
   @Post()
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);
+  }
+
+  @Patch('steps/:stepId')
+  updateStep(@Param('stepId', ParseIntPipe) stepId: number, @Body() dto: UpdateStepDto) {
+    return this.tasksService.updateStep(stepId, dto.completed);
+  }
+
+  @Patch(':taskId')
+  updateTask(@Param('taskId', ParseIntPipe) taskId: number, @Body() dto: UpdateTaskDto) {
+    return this.tasksService.updateTask(taskId, dto);
   }
 }
