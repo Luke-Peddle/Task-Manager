@@ -11,6 +11,7 @@ import { updateStep, type UpdateStepPayload } from "../mutation/updateStep";
 import { updateTask, type UpdateTaskPayload } from "../mutation/updateTask";
 import { QUERY_KEY as CALENDAR_KEY, getCalendarOptions } from "../queries/getCalendar";
 import { QUERY_KEY as TIMELINE_KEY, getTimelineOptions } from "../queries/getTimeline";
+import { QUERY_KEY as TASK_KEY, getTaskOptions } from "../queries/getTask";
 import type { CompletableTask } from "@/types/task";
 
 function fromResult<T>(result: Result<T> | undefined) {
@@ -25,6 +26,7 @@ function useInvalidateTasks() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: [TIMELINE_KEY] }),
       queryClient.invalidateQueries({ queryKey: [CALENDAR_KEY] }),
+      queryClient.invalidateQueries({ queryKey: [TASK_KEY] })
     ]);
 }
 
@@ -57,6 +59,19 @@ export function useTimeline() {
     tasks: data ?? [],
     hasData: data !== undefined,
     loading: query.isPending,
+    error,
+  };
+}
+
+export function useTask(id: number) {
+  const validId = Number.isInteger(id) && id > 0;
+  const query = useQuery({ ...getTaskOptions(id), enabled: validId });
+  const { data, error } = fromResult(query.data);
+
+  return {
+    task: data ?? null,
+    loading: validId && query.isPending,
+    notFound: !validId || query.data?.error?.statusCode === 404,
     error,
   };
 }

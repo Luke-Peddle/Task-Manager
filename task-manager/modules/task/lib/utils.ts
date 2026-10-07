@@ -1,4 +1,4 @@
-import type { Step, StepFormFields, Task, TaskGroup, TaskStatus } from "@/types/task";
+import type { Step, StepFormFields, Task, TaskGroup, TaskStatus, Milestone } from "@/types/task";
 
 const DAY_MS = 86_400_000;
 const DUE_SOON_DAYS = 3;
@@ -92,6 +92,42 @@ export function getTaskSummary(completed: boolean, progress: StepProgress): stri
   return progress.nextStep ? `Next: ${progress.nextStep.name}` : "All steps done";
 }
 
+export function getTaskMilestones(
+  task: Task,
+  isStepChecked: (step: Step) => boolean,
+  completed: boolean,
+  now = Date.now(),
+): Milestone[] {
+  const isPast = (date: string) => new Date(date).getTime() < now;
+  const milestones: Milestone[] = [];
+ 
+  for (const step of task.steps) {
+    if (!step.dueDate) continue;
+    const done = isStepChecked(step);
+    milestones.push({
+      id: `step-${step.id}`,
+      kind: "step",
+      dueDate: step.dueDate,
+      label: step.name,
+      done,
+      overdue: !done && isPast(step.dueDate),
+    });
+  }
+ 
+  if (task.dueDate) {
+    milestones.push({
+      id: "due",
+      kind: "due",
+      dueDate: task.dueDate,
+      label: "Task due",
+      done: completed,
+      overdue: !completed && isPast(task.dueDate),
+    });
+  }
+ 
+  return milestones.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+}
+
 export const EMPTY_STEP_FIELDS: StepFormFields = { name: "", description: "", dueDate: "" };
 
 export function stepToFormFields(step: Step): StepFormFields {
@@ -141,4 +177,29 @@ export function groupByDateKey<T extends { dueDate: string | null }>(items: T[])
     map.set(key, [...(map.get(key) ?? []), item]);
   }
   return map;
+}
+
+export function statusText(milestone: Milestone) {
+  if (milestone.done) return "Done";
+  if (milestone.overdue) return `Overdue, ${formatRelative(milestone.dueDate)}`;
+  return formatRelative(milestone.dueDate);
+}
+
+interface Span {
+  from: Date;
+  to: Date;
+}
+
+export function getSpan(milestones: Milestone[]): Span | undefined {
+  if (milestones.length === 0) return undefined;
+  const today = new Date();
+  const first = new Date(milestones[0].dueDate);
+  const last = new Date(milestones[milestones.length - 1].dueDate);
+  return { from: today < first ? today : first, to: last };
+}
+
+export function initialMonth(span: Span | undefined) {
+  const today = new Date();
+  if (!span || (today >= span.from && today <= span.to)) return startOfMonth(today);
+  return startOfMonth(today > span.to ? span.to : span.from);
 }
