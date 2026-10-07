@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ChevronDown, ClipboardList } from "lucide-react";
+import { AlertCircle, ChevronDown, ClipboardList, Pencil } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,24 +13,25 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { type TaskEditor, useTaskEditor } from "../hooks/useTaskEditor";
+import { useTimeline } from "../hooks/useTasks";
 import {
-  type StepToggle,
-  type TaskCompletion,
-  useTaskCompletion,
-  useTimeline,
-  useUpdateStep,
-} from "../hooks/useTasks";
-import { formatRelative, formatShortDate, getTaskStatus, groupTasks } from "../lib/utils";
+  formatRelative,
+  formatShortDate,
+  getStepProgress,
+  getTaskStatus,
+  getTaskSummary,
+  groupTasks,
+} from "../lib/utils";
 import type { Task, TaskGroup } from "@/types/task";
-import { CompleteTaskDialog } from "./CompleteTaskDialog";
+import { TaskDialogs } from "./dialogs/TaskDialogs";
 import { StepCheckbox } from "./StepCheckbox";
 
 export function UpcomingList() {
   const { tasks, hasData, loading, error } = useTimeline();
-  const stepToggle = useUpdateStep();
-  const completion = useTaskCompletion();
+  const editor = useTaskEditor();
   const groups = groupTasks(tasks);
-  const updateError = completion.error ?? stepToggle.error;
 
   return (
     <Card className="gap-4">
@@ -47,9 +49,9 @@ export function UpcomingList() {
           </Alert>
         )}
 
-        {updateError && (
+        {editor.error && (
           <p role="alert" className="text-sm text-destructive">
-            Couldn&apos;t save that change. {updateError}
+            Couldn&apos;t save that change. {editor.error}
           </p>
         )}
 
@@ -70,68 +72,53 @@ export function UpcomingList() {
         )}
 
         {groups.map((group) => (
-          <TaskGroupSection
-            key={group.id}
-            group={group}
-            stepToggle={stepToggle}
-            completion={completion}
-          />
+          <TaskGroupSection key={group.id} group={group} editor={editor} />
         ))}
       </CardContent>
 
-      <CompleteTaskDialog
-        key={completion.confirming?.id ?? "none"}
-        task={completion.confirming}
-        onConfirm={completion.confirm}
-        onCancel={completion.cancel}
-      />
+      <TaskDialogs editor={editor} />
     </Card>
   );
 }
 
-interface TaskGroupSectionProps {
-  group: TaskGroup;
-  stepToggle: StepToggle;
-  completion: TaskCompletion;
-}
-
-function TaskGroupSection({ group, stepToggle, completion }: TaskGroupSectionProps) {
+function TaskGroupSection({ group, editor }: { group: TaskGroup; editor: TaskEditor }) {
   const collapsible = group.id === "completed";
   const [expanded, setExpanded] = useState(!collapsible);
-  const headingClass = `flex items-center gap-2 text-sm font-medium ${
-    group.id === "overdue" ? "text-destructive" : "text-muted-foreground"
-  }`;
+  const headingClass = cn(
+    "flex items-center gap-2 text-sm font-medium",
+    group.id === "overdue" ? "text-destructive" : "text-muted-foreground",
+  );
+  const label = (
+    <>
+      {group.label}
+      <span className="tabular-nums opacity-70">{group.tasks.length}</span>
+    </>
+  );
 
   return (
     <section aria-labelledby={`group-${group.id}`}>
-      {collapsible ? (
-        <h3 id={`group-${group.id}`} className="mb-2">
+      <h3 id={`group-${group.id}`} className={cn("mb-2", !collapsible && headingClass)}>
+        {collapsible ? (
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
             aria-expanded={expanded}
-            className={`${headingClass} rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring`}
+            className={cn(headingClass, "rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring")}
           >
             <ChevronDown
-              className={`size-4 transition-transform motion-reduce:transition-none ${
-                expanded ? "" : "-rotate-90"
-              }`}
+              className={cn("size-4 transition-transform motion-reduce:transition-none", !expanded && "-rotate-90")}
             />
-            {group.label}
-            <span className="tabular-nums opacity-70">{group.tasks.length}</span>
+            {label}
           </button>
-        </h3>
-      ) : (
-        <h3 id={`group-${group.id}`} className={`mb-2 ${headingClass}`}>
-          {group.label}
-          <span className="tabular-nums opacity-70">{group.tasks.length}</span>
-        </h3>
-      )}
+        ) : (
+          label
+        )}
+      </h3>
 
       {expanded && (
         <ul className="divide-y overflow-hidden rounded-lg border">
           {group.tasks.map((task) => (
-            <TaskRow key={task.id} task={task} stepToggle={stepToggle} completion={completion} />
+            <TaskRow key={task.id} task={task} editor={editor} />
           ))}
         </ul>
       )}
@@ -139,27 +126,12 @@ function TaskGroupSection({ group, stepToggle, completion }: TaskGroupSectionPro
   );
 }
 
-interface TaskRowProps {
-  task: Task;
-  stepToggle: StepToggle;
-  completion: TaskCompletion;
-}
-
-function TaskRow({ task, stepToggle, completion }: TaskRowProps) {
+function TaskRow({ task, editor }: { task: Task; editor: TaskEditor }) {
   const [open, setOpen] = useState(false);
+  const { completion, stepToggle } = editor;
   const checked = completion.isChecked(task);
   const overdue = !checked && getTaskStatus(task.dueDate) === "overdue";
-  const total = task.steps.length;
-  const done = task.steps.filter((step) => stepToggle.isChecked(step)).length;
-  const nextStep = task.steps.find((step) => !stepToggle.isChecked(step));
-
-  const summary = checked
-    ? "Completed"
-    : total === 0
-      ? "No steps"
-      : nextStep
-        ? `Next: ${nextStep.name}`
-        : "All steps done";
+  const progress = getStepProgress(task.steps, stepToggle.isChecked);
 
   return (
     <li className="bg-card">
@@ -179,20 +151,20 @@ function TaskRow({ task, stepToggle, completion }: TaskRowProps) {
           className="flex min-w-0 flex-1 items-start gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <div className="min-w-0 flex-1">
-            <p className={`font-medium ${checked ? "text-muted-foreground line-through" : ""}`}>
-              {task.name}
+            <p className={cn("font-medium", checked && "text-muted-foreground line-through")}>{task.name}</p>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
+              {getTaskSummary(checked, progress)}
             </p>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">{summary}</p>
-            {total > 0 && !checked && (
+            {progress.total > 0 && !checked && (
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
-                    style={{ width: `${(done / total) * 100}%` }}
+                    style={{ width: `${(progress.done / progress.total) * 100}%` }}
                   />
                 </div>
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {done}/{total}
+                  {progress.done}/{progress.total}
                 </span>
               </div>
             )}
@@ -200,11 +172,11 @@ function TaskRow({ task, stepToggle, completion }: TaskRowProps) {
 
           {task.dueDate && (
             <div className="shrink-0 text-right tabular-nums">
-              <p className={`text-sm ${overdue ? "font-medium text-destructive" : ""}`}>
+              <p className={cn("text-sm", overdue && "font-medium text-destructive")}>
                 {formatShortDate(task.dueDate)}
               </p>
               {!checked && (
-                <p className={`text-xs ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
+                <p className={cn("text-xs", overdue ? "text-destructive" : "text-muted-foreground")}>
                   {formatRelative(task.dueDate)}
                 </p>
               )}
@@ -212,19 +184,18 @@ function TaskRow({ task, stepToggle, completion }: TaskRowProps) {
           )}
 
           <ChevronDown
-            className={`mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${
-              open ? "rotate-180" : ""
-            }`}
+            className={cn(
+              "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+              open && "rotate-180",
+            )}
           />
         </button>
       </div>
 
       {open && (
         <div id={`task-${task.id}-steps`} className="border-t bg-muted/30 py-2 pr-3 pl-8">
-          {task.description && (
-            <p className="mb-2 px-2 text-sm text-muted-foreground">{task.description}</p>
-          )}
-          {total === 0 ? (
+          {task.description && <p className="mb-2 px-2 text-sm text-muted-foreground">{task.description}</p>}
+          {task.steps.length === 0 ? (
             <p className="px-2 py-1 text-sm text-muted-foreground">This task has no steps.</p>
           ) : (
             <ul className="space-y-0.5">
@@ -234,11 +205,21 @@ function TaskRow({ task, stepToggle, completion }: TaskRowProps) {
                     step={step}
                     checked={stepToggle.isChecked(step)}
                     onCheckedChange={(value) => stepToggle.toggleStep(step.id, value)}
+                    onEdit={() => editor.editStep(step)}
                   />
                 </li>
               ))}
             </ul>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 text-muted-foreground"
+            onClick={() => editor.editTask(task)}
+          >
+            <Pencil />
+            Edit task
+          </Button>
         </div>
       )}
     </li>

@@ -1,4 +1,4 @@
-import type { Task, TaskGroup, TaskStatus } from "@/types/task";
+import type { Step, StepFormFields, Task, TaskGroup, TaskStatus } from "@/types/task";
 
 const DAY_MS = 86_400_000;
 const DUE_SOON_DAYS = 3;
@@ -27,6 +27,10 @@ export function dateInputToIso(value: string): string | null {
   if (!value) return null;
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
+}
+
+export function isoToDateInput(value: string | null): string {
+  return value ? toDateKey(new Date(value)) : "";
 }
 
 export function getTaskStatus(dueDate: string | null, now = Date.now()): TaskStatus {
@@ -60,6 +64,50 @@ export function groupTasks(tasks: Task[], now = Date.now()): TaskGroup[] {
   }
 
   return groups.filter((group) => group.tasks.length > 0);
+}
+
+interface ProgressStep {
+  id: number;
+  name: string;
+  completed: boolean;
+}
+
+export function getStepProgress<S extends ProgressStep>(
+  steps: S[],
+  isChecked: (step: S) => boolean = (step) => step.completed,
+) {
+  const remaining = steps.filter((step) => !isChecked(step));
+  return {
+    total: steps.length,
+    done: steps.length - remaining.length,
+    nextStep: remaining[0] ?? null,
+  };
+}
+
+export type StepProgress = ReturnType<typeof getStepProgress>;
+
+export function getTaskSummary(completed: boolean, progress: StepProgress): string {
+  if (completed) return "Completed";
+  if (progress.total === 0) return "No steps";
+  return progress.nextStep ? `Next: ${progress.nextStep.name}` : "All steps done";
+}
+
+export const EMPTY_STEP_FIELDS: StepFormFields = { name: "", description: "", dueDate: "" };
+
+export function stepToFormFields(step: Step): StepFormFields {
+  return {
+    name: step.name,
+    description: step.description ?? "",
+    dueDate: isoToDateInput(step.dueDate),
+  };
+}
+
+export function formFieldsToStepPayload(fields: StepFormFields) {
+  return {
+    name: fields.name.trim(),
+    description: fields.description.trim() || null,
+    dueDate: dateInputToIso(fields.dueDate),
+  };
 }
 
 export function toDateKey(date: Date): string {
