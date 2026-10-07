@@ -1,32 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ChevronDown, ClipboardList, Pencil } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, ArrowRight, ChevronDown, ClipboardList } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { type TaskEditor, useTaskEditor } from "../hooks/useTaskEditor";
 import { useTimeline } from "../hooks/useTasks";
-import {
-  formatRelative,
-  formatShortDate,
-  getStepProgress,
-  getTaskStatus,
-  getTaskSummary,
-  groupTasks,
-} from "../lib/utils";
-import type { Task, TaskGroup } from "@/types/task";
+import { groupTasks } from "../lib/utils";
+import type { TaskGroup } from "@/types/task";
 import { TaskDialogs } from "./dialogs/TaskDialogs";
-import { StepCheckbox } from "./StepCheckbox";
+import { TaskRow } from "./TaskRow";
 
 export function UpcomingList() {
   const { tasks, hasData, loading, error } = useTimeline();
@@ -38,6 +31,16 @@ export function UpcomingList() {
       <CardHeader>
         <CardTitle className="text-lg">Tasks</CardTitle>
         <CardDescription>By due date. Open one to see its steps.</CardDescription>
+        <CardAction>
+          <Link
+            href="/tasks"
+            aria-label="Go to the Tasks page"
+            title="All tasks"
+            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <ArrowRight className="size-4" />
+          </Link>
+        </CardAction>
       </CardHeader>
 
       <CardContent className="space-y-5 xl:max-h-[calc(100vh-12rem)] xl:overflow-y-auto">
@@ -103,10 +106,16 @@ function TaskGroupSection({ group, editor }: { group: TaskGroup; editor: TaskEdi
             type="button"
             onClick={() => setExpanded(!expanded)}
             aria-expanded={expanded}
-            className={cn(headingClass, "rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring")}
+            className={cn(
+              headingClass,
+              "rounded-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+            )}
           >
             <ChevronDown
-              className={cn("size-4 transition-transform motion-reduce:transition-none", !expanded && "-rotate-90")}
+              className={cn(
+                "size-4 transition-transform motion-reduce:transition-none",
+                !expanded && "-rotate-90",
+              )}
             />
             {label}
           </button>
@@ -123,105 +132,5 @@ function TaskGroupSection({ group, editor }: { group: TaskGroup; editor: TaskEdi
         </ul>
       )}
     </section>
-  );
-}
-
-function TaskRow({ task, editor }: { task: Task; editor: TaskEditor }) {
-  const [open, setOpen] = useState(false);
-  const { completion, stepToggle } = editor;
-  const checked = completion.isChecked(task);
-  const overdue = !checked && getTaskStatus(task.dueDate) === "overdue";
-  const progress = getStepProgress(task.steps, stepToggle.isChecked);
-
-  return (
-    <li className="bg-card">
-      <div className="flex items-start gap-3 px-3 py-3">
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(value) => completion.toggle(task, value === true)}
-          aria-label={checked ? `Mark ${task.name} as not done` : `Complete ${task.name}`}
-          className="mt-0.5"
-        />
-
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          aria-controls={`task-${task.id}-steps`}
-          className="flex min-w-0 flex-1 items-start gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <div className="min-w-0 flex-1">
-            <p className={cn("font-medium", checked && "text-muted-foreground line-through")}>{task.name}</p>
-            <p className="mt-0.5 truncate text-sm text-muted-foreground">
-              {getTaskSummary(checked, progress)}
-            </p>
-            {progress.total > 0 && !checked && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
-                    style={{ width: `${(progress.done / progress.total) * 100}%` }}
-                  />
-                </div>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {progress.done}/{progress.total}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {task.dueDate && (
-            <div className="shrink-0 text-right tabular-nums">
-              <p className={cn("text-sm", overdue && "font-medium text-destructive")}>
-                {formatShortDate(task.dueDate)}
-              </p>
-              {!checked && (
-                <p className={cn("text-xs", overdue ? "text-destructive" : "text-muted-foreground")}>
-                  {formatRelative(task.dueDate)}
-                </p>
-              )}
-            </div>
-          )}
-
-          <ChevronDown
-            className={cn(
-              "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      </div>
-
-      {open && (
-        <div id={`task-${task.id}-steps`} className="border-t bg-muted/30 py-2 pr-3 pl-8">
-          {task.description && <p className="mb-2 px-2 text-sm text-muted-foreground">{task.description}</p>}
-          {task.steps.length === 0 ? (
-            <p className="px-2 py-1 text-sm text-muted-foreground">This task has no steps.</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {task.steps.map((step) => (
-                <li key={step.id}>
-                  <StepCheckbox
-                    step={step}
-                    checked={stepToggle.isChecked(step)}
-                    onCheckedChange={(value) => stepToggle.toggleStep(step.id, value)}
-                    onEdit={() => editor.editStep(step)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-1 text-muted-foreground"
-            onClick={() => editor.editTask(task)}
-          >
-            <Pencil />
-            Edit task
-          </Button>
-        </div>
-      )}
-    </li>
   );
 }

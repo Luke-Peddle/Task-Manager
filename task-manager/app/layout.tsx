@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk } from "next/font/google";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -21,7 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${hanken.className} min-h-screen bg-muted/40 antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="flex min-h-screen">
+            <AppSidebar />
+            <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
+          </div>
+        </Providers>
       </body>
     </html>
   );
