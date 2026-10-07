@@ -18,6 +18,12 @@ export class TasksService {
     });
   }
 
+  async findOne(id: number) {
+    const task = await this.prisma.task.findUnique({ where: { id }, include: WITH_STEPS });
+    if (!task) throw new NotFoundException(`Task ${id} doesn't exist.`);
+    return task;
+  }
+
   async findCalendar(from: Date, to: Date) {
     const [tasks, steps] = await this.prisma.$transaction([
       this.prisma.task.findMany({

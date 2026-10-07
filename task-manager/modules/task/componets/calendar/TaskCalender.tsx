@@ -25,7 +25,11 @@ import { CalendarDay } from "./CalendarDay";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function TaskCalendar() {
+interface TaskCalendarProps {
+  taskId?: number;
+}
+
+export function TaskCalendar({ taskId }: TaskCalendarProps) {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [openKey, setOpenKey] = useState<string | null>(null);
   const editor = useTaskEditor();
@@ -35,8 +39,11 @@ export function TaskCalendar() {
   const to = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 1);
   const { data, error } = useCalendar(days[0].toISOString(), to.toISOString());
 
-  const tasksByDay = groupByDateKey(data?.tasks ?? []);
-  const stepsByDay = groupByDateKey(data?.steps ?? []);
+  const forTask = taskId !== undefined;
+  const tasks = (data?.tasks ?? []).filter((task) => !forTask || task.id === taskId);
+  const steps = (data?.steps ?? []).filter((step) => !forTask || step.taskId === taskId);
+  const tasksByDay = groupByDateKey(tasks);
+  const stepsByDay = groupByDateKey(steps);
   const todayKey = toDateKey(new Date());
 
   const dayEditor = {
@@ -112,6 +119,7 @@ export function TaskCalendar() {
                 open={openKey === key}
                 onOpenChange={(open) => setOpenKey(open ? key : null)}
                 editor={dayEditor}
+                showStepNames={forTask}
               />
             );
           })}
@@ -119,6 +127,7 @@ export function TaskCalendar() {
 
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
           <Legend className="bg-sky-500/15 ring-1 ring-sky-500/40" label="Task due" />
+          {forTask && <Legend className="bg-violet-500/15 ring-1 ring-violet-500/40" label="Step due" />}
           <Legend className="bg-destructive/15 ring-1 ring-destructive/40" label="Overdue" />
           <Legend className="bg-muted ring-1 ring-border" label="Completed" />
         </div>

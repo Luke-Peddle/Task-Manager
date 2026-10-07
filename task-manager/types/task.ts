@@ -49,3 +49,14 @@ export interface StepFormFields {
   description: string;
   dueDate: string;
 }
+
+export type MilestoneKind = "step" | "due";
+
+export interface Milestone {
+  id: string;
+  kind: MilestoneKind;
+  dueDate: string;
+  label: string;
+  done: boolean;
+  overdue: boolean;
+}

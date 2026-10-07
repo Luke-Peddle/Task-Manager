@@ -11,6 +11,7 @@ import type { CalendarStep, CalendarTask } from "@/types/task";
 import { StepCheckbox } from "../StepCheckbox";
 
 const MAX_VISIBLE_TASKS = 2;
+const MAX_VISIBLE_ITEMS = 3;
 
 interface CalendarDayProps {
   day: Date;
@@ -22,18 +23,30 @@ interface CalendarDayProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editor: TaskEditor;
+  showStepNames?: boolean;
 }
 
 export function CalendarDay(props: CalendarDayProps) {
-  const { day, inMonth, isToday, isPast, tasks, steps, open, onOpenChange, editor } = props;
-  const visibleTasks = tasks.slice(0, MAX_VISIBLE_TASKS);
-  const hiddenCount = tasks.length - visibleTasks.length;
+  const { day, inMonth, isToday, isPast, tasks, steps, open, onOpenChange, editor, showStepNames } =
+    props;
+  const visibleTasks = tasks.slice(0, showStepNames ? MAX_VISIBLE_ITEMS : MAX_VISIBLE_TASKS);
+  const visibleSteps = showStepNames
+    ? steps.slice(0, Math.max(0, MAX_VISIBLE_ITEMS - visibleTasks.length))
+    : [];
+  const hiddenCount =
+    tasks.length - visibleTasks.length + (showStepNames ? steps.length - visibleSteps.length : 0);
   const itemCount = tasks.length + steps.length;
 
   function chipClass(task: CalendarTask) {
     if (editor.completion.isChecked(task)) return "bg-muted text-muted-foreground line-through";
     if (isPast) return "bg-destructive/10 text-destructive";
     return "bg-sky-500/10 text-sky-700 dark:text-sky-300";
+  }
+
+  function stepChipClass(step: CalendarStep) {
+    if (editor.stepToggle.isChecked(step)) return "bg-muted text-muted-foreground line-through";
+    if (isPast) return "bg-destructive/10 text-destructive";
+    return "bg-violet-500/10 text-violet-700 dark:text-violet-300";
   }
 
   return (
@@ -68,10 +81,18 @@ export function CalendarDay(props: CalendarDayProps) {
               {task.name}
             </span>
           ))}
+          {visibleSteps.map((step) => (
+            <span
+              key={step.id}
+              className={cn("truncate rounded px-1.5 py-0.5 text-xs font-medium", stepChipClass(step))}
+            >
+              {step.name}
+            </span>
+          ))}
           {hiddenCount > 0 && (
             <span className="px-1.5 text-xs text-muted-foreground">+{hiddenCount} more</span>
           )}
-          {steps.length > 0 && (
+          {!showStepNames && steps.length > 0 && (
             <span className="px-1.5 text-xs text-muted-foreground">
               {steps.length} {steps.length === 1 ? "step" : "steps"}
             </span>

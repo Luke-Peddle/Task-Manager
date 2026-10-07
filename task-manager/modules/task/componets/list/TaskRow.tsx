@@ -1,21 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Pencil } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronDown, Pencil } from "lucide-react";
 import { ProgressBar } from "@/components/progressBar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { TaskEditor } from "../hooks/useTaskEditor";
+import type { TaskEditor } from "../../hooks/useTaskEditor";
 import {
   formatRelative,
   formatShortDate,
   getStepProgress,
   getTaskStatus,
   getTaskSummary,
-} from "../lib/utils";
+} from "../../lib/utils";
 import type { Task } from "@/types/task";
-import { StepCheckbox } from "./StepCheckbox";
+import { StepCheckbox } from "../StepCheckbox";
 
 export function TaskRow({ task, editor }: { task: Task; editor: TaskEditor }) {
   const [open, setOpen] = useState(false);
@@ -84,17 +85,27 @@ export function TaskRow({ task, editor }: { task: Task; editor: TaskEditor }) {
           />
         </button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="-mt-1 -mr-2 size-8 shrink-0 text-muted-foreground"
-          aria-label={`Edit ${task.name}`}
-          title="Edit task"
-          onClick={() => editor.editTask(task)}
-        >
-          <Pencil />
-        </Button>
+        <div className="-mt-1 -mr-2 flex shrink-0 items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={`Edit ${task.name}`}
+            title="Edit task"
+            onClick={() => editor.editTask(task)}
+          >
+            <Pencil />
+          </Button>
+          <Link
+            href={`/tasks/${task.id}`}
+            aria-label={`Open ${task.name}`}
+            title="Open task"
+            className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <ArrowUpRight className="size-4" />
+          </Link>
+        </div>
       </div>
 
       {open && (

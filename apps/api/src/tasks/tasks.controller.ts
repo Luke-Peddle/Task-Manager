@@ -39,6 +39,11 @@ export class TasksController {
     return this.tasksService.findCalendar(start, end);
   }
 
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.tasksService.findOne(id);
+  }
+
   @Post()
   create(@Body() dto: CreateTaskDto) {
     return this.tasksService.create(dto);

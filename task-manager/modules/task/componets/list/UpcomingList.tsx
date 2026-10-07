@@ -14,11 +14,11 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { type TaskEditor, useTaskEditor } from "../hooks/useTaskEditor";
-import { useTimeline } from "../hooks/useTasks";
-import { groupTasks } from "../lib/utils";
+import { type TaskEditor, useTaskEditor } from "../../hooks/useTaskEditor";
+import { useTimeline } from "../../hooks/useTasks";
+import { groupTasks } from "../../lib/utils";
 import type { TaskGroup } from "@/types/task";
-import { TaskDialogs } from "./dialogs/TaskDialogs";
+import { TaskDialogs } from "../dialogs/TaskDialogs";
 import { TaskRow } from "./TaskRow";
 
 export function UpcomingList() {

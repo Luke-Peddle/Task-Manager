@@ -7,12 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useTaskEditor } from "../hooks/useTaskEditor";
-import { useTimeline } from "../hooks/useTasks";
-import { groupTasks } from "../lib/utils";
+import { useTaskEditor } from "../../hooks/useTaskEditor";
+import { useTimeline } from "../../hooks/useTasks";
+import { groupTasks } from "../../lib/utils";
 import type { Task } from "@/types/task";
-import { AddTask } from "./AddTask";
-import { TaskDialogs } from "./dialogs/TaskDialogs";
+import { AddTask } from "../AddTask";
+import { TaskDialogs } from "../dialogs/TaskDialogs";
 import { TaskRow } from "./TaskRow";
 
 type Filter = "active" | "completed" | "all";

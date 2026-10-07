@@ -1,4 +1,4 @@
-import { TaskListPage } from "@/modules/task/componets/TaskListPage";
+import { TaskListPage } from "@/modules/task/componets/list/TaskListPage";
 
 export default function TasksPage() {
   return (
