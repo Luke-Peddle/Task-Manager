@@ -28,6 +28,27 @@ function useInvalidateTasks() {
     ]);
 }
 
+function useSaveMutation<P, T>(mutationFn: (payload: P) => Promise<Result<T>>) {
+  const invalidate = useInvalidateTasks();
+
+  const mutation = useMutation({
+    mutationFn,
+    onSuccess: (result) => {
+      if (result.error === null) return invalidate();
+    },
+  });
+
+  return {
+    save: async (payload: P) => {
+      const result = await mutation.mutateAsync(payload);
+      return result.error === null ? result.data : null;
+    },
+    submitting: mutation.isPending,
+    error: fromResult(mutation.data).error,
+    resetError: mutation.reset,
+  };
+}
+
 export function useTimeline() {
   const query = useQuery(getTimelineOptions());
   const { data, error } = fromResult(query.data);
@@ -48,24 +69,15 @@ export function useCalendar(from: string, to: string) {
 }
 
 export function useCreateTask() {
-  const invalidate = useInvalidateTasks();
+  return useSaveMutation((payload: CreateTaskPayload) => createTask(payload));
+}
 
-  const mutation = useMutation({
-    mutationFn: (payload: CreateTaskPayload) => createTask(payload),
-    onSuccess: (result) => {
-      if (result.error === null) return invalidate();
-    },
-  });
+export function useSaveTask() {
+  return useSaveMutation((payload: UpdateTaskPayload) => updateTask(payload));
+}
 
-  return {
-    createTask: async (payload: CreateTaskPayload) => {
-      const result = await mutation.mutateAsync(payload);
-      return result.error === null ? result.data : null;
-    },
-    submitting: mutation.isPending,
-    error: fromResult(mutation.data).error,
-    resetError: mutation.reset,
-  };
+export function useSaveStep() {
+  return useSaveMutation((payload: UpdateStepPayload) => updateStep(payload));
 }
 
 export function useUpdateStep() {
@@ -81,7 +93,7 @@ export function useUpdateStep() {
   return {
     toggleStep: (stepId: number, completed: boolean) => mutation.mutate({ stepId, completed }),
     isChecked: (step: { id: number; completed: boolean }) =>
-      pending?.stepId === step.id ? pending.completed : step.completed,
+      pending?.stepId === step.id ? (pending.completed ?? step.completed) : step.completed,
     error: fromResult(mutation.data).error,
   };
 }
@@ -117,7 +129,7 @@ export function useTaskCompletion() {
     cancel: () => setConfirming(null),
     confirming,
     isChecked: (task: { id: number; completed: boolean }) =>
-      pending?.taskId === task.id ? pending.completed : task.completed,
+      pending?.taskId === task.id ? (pending.completed ?? task.completed) : task.completed,
     error: fromResult(mutation.data).error,
   };
 }

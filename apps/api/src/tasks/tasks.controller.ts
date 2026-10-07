@@ -10,7 +10,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto.js';
-import { UpdateStepDto } from './dto/update-step.dto.js';
 import { UpdateTaskDto } from './dto/update-task.dto.js';
 import { TasksService } from './tasks.service.js';
 
@@ -45,13 +44,8 @@ export class TasksController {
     return this.tasksService.create(dto);
   }
 
-  @Patch('steps/:stepId')
-  updateStep(@Param('stepId', ParseIntPipe) stepId: number, @Body() dto: UpdateStepDto) {
-    return this.tasksService.updateStep(stepId, dto.completed);
-  }
-
-  @Patch(':taskId')
-  updateTask(@Param('taskId', ParseIntPipe) taskId: number, @Body() dto: UpdateTaskDto) {
-    return this.tasksService.updateTask(taskId, dto);
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTaskDto) {
+    return this.tasksService.update(id, dto);
   }
 }

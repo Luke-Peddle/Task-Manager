@@ -23,7 +23,7 @@ export interface CompletableTask {
   steps: { id: number; name: string; completed: boolean }[];
 }
 
-export interface CalendarTask extends CompletableTask {
+export interface CalendarTask extends Task {
   dueDate: string;
 }
 
@@ -42,4 +42,10 @@ export interface TaskGroup {
   id: "overdue" | "this-week" | "later" | "no-date" | "completed";
   label: string;
   tasks: Task[];
+}
+
+export interface StepFormFields {
+  name: string;
+  description: string;
+  dueDate: string;
 }

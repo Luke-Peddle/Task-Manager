@@ -1,11 +1,20 @@
 import { Result } from "@/types/Result";
 import { httpClient } from "@/lib/httpClient/HTTPClient";
 import { Task } from "@/types/task";
+import { CreateStepPayload } from "./createTask";
+
+export interface TaskStepPayload extends CreateStepPayload {
+  id?: number;
+}
 
 export interface UpdateTaskPayload {
   taskId: number;
-  completed: boolean;
+  name?: string;
+  description?: string | null;
+  dueDate?: string | null;
+  completed?: boolean;
   completeSteps?: boolean;
+  steps?: TaskStepPayload[];
 }
 
 export const updateTask = async (
