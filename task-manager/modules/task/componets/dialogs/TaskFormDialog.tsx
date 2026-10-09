@@ -14,22 +14,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useCreateTask, useSaveTask } from "../../hooks/useTasks";
-import {
-  EMPTY_STEP_FIELDS,
-  dateInputToIso,
-  formFieldsToStepPayload,
-  isoToDateInput,
-  stepToFormFields,
-} from "../../lib/utils";
-import type { StepFormFields, Task } from "@/types/task";
+import { EMPTY_STEP_FIELDS,
+   draftsToStepPayloads,
+   formFieldsToTaskDetails, 
+   getLateStepKeys,
+   stepToFormFields,
+   taskToFormFields
+  } from "../../lib/forms";
+import type { Step, StepDraft, StepFormFields, Task } from "@/types/task";
 import { DateInput } from "@/components/form/DateInput";
 import { StepDialog } from "./StepDialog";
-
-interface StepDraft extends StepFormFields {
-  key: number;
-  id?: number;
-}
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -37,25 +33,11 @@ interface TaskFormDialogProps {
   task?: Task | null;
 }
 
-export function TaskFormDialog(props : TaskFormDialogProps) {
-
-  const { open, onOpenChange, task } = props;
+export function TaskFormDialog({ open, onOpenChange, task }: TaskFormDialogProps) {
   const isEditing = Boolean(task);
-  const nextStepKey = useRef(0);
-  const [form, setForm] = useState({
-    name: task?.name ?? "",
-    description: task?.description ?? "",
-    dueDate: isoToDateInput(task?.dueDate ?? null),
-  });
-  const [steps, setSteps] = useState<StepDraft[]>(() =>
-    (task?.steps ?? []).map((step) => ({
-      key: nextStepKey.current++,
-      id: step.id,
-      ...stepToFormFields(step),
-    })),
-  );
+  const [form, setForm] = useState(() => taskToFormFields(task));
   const [showErrors, setShowErrors] = useState(false);
-  const [stepDialog, setStepDialog] = useState({ open: false, editingKey: null as number | null, key: 0 });
+  const steps = useStepDrafts(task?.steps ?? [], form.dueDate);
 
   const create = useCreateTask();
   const update = useSaveTask();
@@ -63,7 +45,7 @@ export function TaskFormDialog(props : TaskFormDialogProps) {
   const error = isEditing ? update.error : create.error;
 
   const nameMissing = !form.name.trim();
-  const editingStep = steps.find((step) => step.key === stepDialog.editingKey) ?? null;
+  const hasLateSteps = steps.lateKeys.size > 0;
 
   function handleOpenChange(next: boolean) {
     onOpenChange(next);
@@ -73,41 +55,18 @@ export function TaskFormDialog(props : TaskFormDialogProps) {
     }
   }
 
-  function openStepDialog(editingKey: number | null) {
-    setStepDialog((current) => ({ open: true, editingKey, key: current.key + 1 }));
-  }
-
-  function saveStepDraft(fields: StepFormFields) {
-    if (stepDialog.editingKey !== null) {
-      setSteps((current) =>
-        current.map((step) => (step.key === stepDialog.editingKey ? { ...step, ...fields } : step)),
-      );
-    } else {
-      setSteps((current) => [...current, { key: nextStepKey.current++, ...fields }]);
-    }
-    setStepDialog((current) => ({ ...current, open: false }));
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (nameMissing) {
+    if (nameMissing || hasLateSteps) {
       setShowErrors(true);
       return;
     }
 
-    const details = {
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      dueDate: dateInputToIso(form.dueDate),
-    };
-
+    const details = formFieldsToTaskDetails(form);
+    const stepPayloads = draftsToStepPayloads(steps.drafts);
     const saved = task
-      ? await update.save({
-          taskId: task.id,
-          ...details,
-          steps: steps.map((step) => ({ id: step.id, ...formFieldsToStepPayload(step) })),
-        })
-      : await create.save({ ...details, steps: steps.map(formFieldsToStepPayload) });
+      ? await update.save({ taskId: task.id, ...details, steps: stepPayloads })
+      : await create.save({ ...details, steps: stepPayloads });
 
     if (saved) handleOpenChange(false);
   }
@@ -176,37 +135,45 @@ export function TaskFormDialog(props : TaskFormDialogProps) {
                   Steps
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {steps.length === 0
+                  {steps.drafts.length === 0
                     ? "Optional smaller pieces of the task."
-                    : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`}
+                    : `${steps.drafts.length} ${steps.drafts.length === 1 ? "step" : "steps"}`}
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => openStepDialog(null)}>
+              <Button type="button" variant="outline" size="sm" onClick={steps.openNew}>
                 <ListPlus />
                 Add step
               </Button>
             </div>
 
-            {steps.length === 0 ? (
+            {steps.drafts.length === 0 ? (
               <button
                 type="button"
-                onClick={() => openStepDialog(null)}
+                onClick={steps.openNew}
                 className="w-full rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 No steps added yet.
               </button>
             ) : (
               <ol className="grid gap-2 sm:grid-cols-2">
-                {steps.map((step, index) => (
+                {steps.drafts.map((step, index) => (
                   <StepChip
                     key={step.key}
                     step={step}
                     index={index}
-                    onEdit={() => openStepDialog(step.key)}
-                    onRemove={() => setSteps((current) => current.filter((s) => s.key !== step.key))}
+                    late={showErrors && steps.lateKeys.has(step.key)}
+                    onEdit={() => steps.openEdit(step.key)}
+                    onRemove={() => steps.remove(step.key)}
                   />
                 ))}
               </ol>
+            )}
+            {showErrors && hasLateSteps && (
+              <p role="alert" className="text-sm text-destructive">
+                {steps.lateKeys.size === 1 ? "One step is" : `${steps.lateKeys.size} steps are`} due after
+                the task. Move {steps.lateKeys.size === 1 ? "it" : "them"} earlier, or push the task&apos;s
+                due date back.
+              </p>
             )}
           </section>
 
@@ -229,13 +196,14 @@ export function TaskFormDialog(props : TaskFormDialogProps) {
         </form>
 
         <StepDialog
-          key={stepDialog.key}
-          open={stepDialog.open}
-          onOpenChange={(next) => setStepDialog((current) => ({ ...current, open: next }))}
-          title={editingStep ? "Edit step" : "New step"}
-          submitLabel={editingStep ? "Done" : "Add step"}
-          initial={editingStep ?? EMPTY_STEP_FIELDS}
-          onSave={saveStepDraft}
+          key={steps.dialog.key}
+          open={steps.dialog.open}
+          onOpenChange={steps.setDialogOpen}
+          title={steps.editing ? "Edit step" : "New step"}
+          submitLabel={steps.editing ? "Done" : "Add step"}
+          initial={steps.editing ?? EMPTY_STEP_FIELDS}
+          onSave={steps.save}
+          maxDate={form.dueDate || null}
         />
       </DialogContent>
     </Dialog>
@@ -245,14 +213,19 @@ export function TaskFormDialog(props : TaskFormDialogProps) {
 interface StepChipProps {
   step: StepDraft;
   index: number;
+  late: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }
 
-function StepChip(props: StepChipProps) {
-    const { step, index, onEdit, onRemove } = props
+function StepChip({ step, index, late, onEdit, onRemove }: StepChipProps) {
   return (
-    <li className="flex items-center gap-1 rounded-md border bg-muted/30 pl-3 transition-colors hover:bg-muted/60">
+    <li
+      className={cn(
+        "flex items-center gap-1 rounded-md border bg-muted/30 pl-3 transition-colors hover:bg-muted/60",
+        late && "border-destructive bg-destructive/5",
+      )}
+    >
       <button
         type="button"
         onClick={onEdit}
@@ -274,4 +247,45 @@ function StepChip(props: StepChipProps) {
       </Button>
     </li>
   );
+}
+
+interface DialogState {
+  open: boolean;
+  editingKey: number | null;
+  key: number;
+}
+
+function useStepDrafts(initialSteps: Step[], taskDueDate: string) {
+  const nextKey = useRef(0);
+  const [drafts, setDrafts] = useState<StepDraft[]>(() =>
+    initialSteps.map((step) => ({ key: nextKey.current++, id: step.id, ...stepToFormFields(step) })),
+  );
+  const [dialog, setDialog] = useState<DialogState>({ open: false, editingKey: null, key: 0 });
+
+  function open(editingKey: number | null) {
+    setDialog((current) => ({ open: true, editingKey, key: current.key + 1 }));
+  }
+
+  function save(fields: StepFormFields) {
+    if (dialog.editingKey !== null) {
+      setDrafts((current) =>
+        current.map((draft) => (draft.key === dialog.editingKey ? { ...draft, ...fields } : draft)),
+      );
+    } else {
+      setDrafts((current) => [...current, { key: nextKey.current++, ...fields }]);
+    }
+    setDialog((current) => ({ ...current, open: false }));
+  }
+
+  return {
+    drafts,
+    editing: drafts.find((draft) => draft.key === dialog.editingKey) ?? null,
+    lateKeys: getLateStepKeys(drafts, taskDueDate),
+    dialog,
+    openNew: () => open(null),
+    openEdit: (key: number) => open(key),
+    setDialogOpen: (next: boolean) => setDialog((current) => ({ ...current, open: next })),
+    save,
+    remove: (key: number) => setDrafts((current) => current.filter((draft) => draft.key !== key)),
+  };
 }

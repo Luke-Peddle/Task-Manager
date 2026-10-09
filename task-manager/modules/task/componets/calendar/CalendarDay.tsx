@@ -6,12 +6,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import type { TaskEditor } from "../../hooks/useTaskEditor";
-import { getStepProgress } from "../../lib/utils";
+import { getStepProgress } from "./../../lib/tasks"; 
 import type { CalendarStep, CalendarTask } from "@/types/task";
 import { StepCheckbox } from "../StepCheckbox";
 
 const MAX_VISIBLE_TASKS = 2;
 const MAX_VISIBLE_ITEMS = 3;
+
+const CHIP_CLASS = {
+  done: "bg-muted text-muted-foreground line-through",
+  overdue: "bg-destructive/10 text-destructive",
+  task: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  step: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+};
 
 interface CalendarDayProps {
   day: Date;
@@ -37,16 +44,10 @@ export function CalendarDay(props: CalendarDayProps) {
     tasks.length - visibleTasks.length + (showStepNames ? steps.length - visibleSteps.length : 0);
   const itemCount = tasks.length + steps.length;
 
-  function chipClass(task: CalendarTask) {
-    if (editor.completion.isChecked(task)) return "bg-muted text-muted-foreground line-through";
-    if (isPast) return "bg-destructive/10 text-destructive";
-    return "bg-sky-500/10 text-sky-700 dark:text-sky-300";
-  }
-
-  function stepChipClass(step: CalendarStep) {
-    if (editor.stepToggle.isChecked(step)) return "bg-muted text-muted-foreground line-through";
-    if (isPast) return "bg-destructive/10 text-destructive";
-    return "bg-violet-500/10 text-violet-700 dark:text-violet-300";
+  function chipClass(kind: "task" | "step", done: boolean) {
+    if (done) return CHIP_CLASS.done;
+    if (isPast) return CHIP_CLASS.overdue;
+    return CHIP_CLASS[kind];
   }
 
   return (
@@ -76,7 +77,7 @@ export function CalendarDay(props: CalendarDayProps) {
           {visibleTasks.map((task) => (
             <span
               key={task.id}
-              className={cn("truncate rounded px-1.5 py-0.5 text-xs font-medium", chipClass(task))}
+              className={cn("truncate rounded px-1.5 py-0.5 text-xs font-medium", chipClass("task", editor.completion.isChecked(task)))}
             >
               {task.name}
             </span>
@@ -84,7 +85,7 @@ export function CalendarDay(props: CalendarDayProps) {
           {visibleSteps.map((step) => (
             <span
               key={step.id}
-              className={cn("truncate rounded px-1.5 py-0.5 text-xs font-medium", stepChipClass(step))}
+              className={cn("truncate rounded px-1.5 py-0.5 text-xs font-medium", chipClass("step", editor.stepToggle.isChecked(step)))}
             >
               {step.name}
             </span>
@@ -193,8 +194,8 @@ function DayDetails({ day, tasks, steps, editor }: DayDetailsProps) {
                   step={step}
                   taskName={step.task.name}
                   checked={stepToggle.isChecked(step)}
-                  onCheckedChange={(value) => stepToggle.toggleStep(step.id, value)}
-                  onEdit={() => editor.editStep(step)}
+                  onCheckedChange={(value) => stepToggle.toggleStep(step, value, step.task)}
+                  onEdit={() => editor.editStep(step, step.task)}
                 />
               </li>
             ))}

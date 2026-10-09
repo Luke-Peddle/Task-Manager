@@ -14,7 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSaveStep } from "../../hooks/useTasks";
-import { EMPTY_STEP_FIELDS, formFieldsToStepPayload, stepToFormFields } from "../../lib/utils";
+import { EMPTY_STEP_FIELDS } from "../../lib/forms";
+import {dateInputToIso, formatShortDate, isoToDateInput} from "@/lib/dates";
+import { formFieldsToStepPayload, stepToFormFields } from "../../lib/forms";
 import type { Step, StepFormFields } from "@/types/task";
 
 interface StepDialogProps {
@@ -26,18 +28,21 @@ interface StepDialogProps {
   onSave: (fields: StepFormFields) => void;
   saving?: boolean;
   error?: string | null;
+  maxDate?: string | null;
 }
 
 export function StepDialog(props: StepDialogProps) {
-  const { open, onOpenChange, title, submitLabel, initial, onSave, saving, error } = props;
+  const { open, onOpenChange, title, submitLabel, initial, onSave, saving, error, maxDate } = props;
   const [fields, setFields] = useState<StepFormFields>(initial);
   const [showErrors, setShowErrors] = useState(false);
   const nameMissing = !fields.name.trim();
+  const tooLate = Boolean(maxDate && fields.dueDate && fields.dueDate > maxDate);
+  const taskDueLabel = maxDate ? formatShortDate(dateInputToIso(maxDate)!) : null;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     event.stopPropagation();
-    if (nameMissing) {
+    if (nameMissing || tooLate) {
       setShowErrors(true);
       return;
     }
@@ -89,9 +94,22 @@ export function StepDialog(props: StepDialogProps) {
             <DateInput
               id="step-due-date"
               value={fields.dueDate}
+              max={maxDate ?? undefined}
               onChange={(e) => setFields({ ...fields, dueDate: e.target.value })}
+              aria-invalid={showErrors && tooLate}
+              aria-describedby="step-due-date-hint"
               className="w-full sm:w-48"
             />
+            {taskDueLabel && (
+              <p
+                id="step-due-date-hint"
+                className={showErrors && tooLate ? "text-sm text-destructive" : "text-sm text-muted-foreground"}
+              >
+                {showErrors && tooLate
+                  ? `Pick a date on or before ${taskDueLabel}, when the task is due.`
+                  : `The task is due ${taskDueLabel}.`}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -118,9 +136,10 @@ interface EditStepDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   step: Step | null;
+  taskDueDate: string | null;
 }
 
-export function EditStepDialog({ open, onOpenChange, step }: EditStepDialogProps) {
+export function EditStepDialog({ open, onOpenChange, step, taskDueDate }: EditStepDialogProps) {
   const { save, submitting, error, resetError } = useSaveStep();
 
   function handleOpenChange(next: boolean) {
@@ -144,6 +163,7 @@ export function EditStepDialog({ open, onOpenChange, step }: EditStepDialogProps
       onSave={handleSave}
       saving={submitting}
       error={error}
+      maxDate={isoToDateInput(taskDueDate)}
     />
   );
 }
