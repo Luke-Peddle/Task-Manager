@@ -25,7 +25,8 @@ import { ProgressBar } from "@/components/progressBar";
 import { cn } from "@/lib/utils";
 import { useTaskEditor } from "../../hooks/useTaskEditor";
 import { useTask } from "../../hooks/useTasks";
-import { formatDate, formatRelative, getStepProgress, getTaskStatus } from "../../lib/utils";
+import  {formatDate, formatRelative} from "@/lib/dates";
+import { getStepProgress, getTaskStatus } from "../../lib/tasks";
 import { TaskDialogs } from "../dialogs/TaskDialogs";
 import { StepCheckbox } from "../StepCheckbox";
 import { TaskCalendar } from "../calendar/TaskCalender";
@@ -203,8 +204,8 @@ export function TaskDetail({ taskId }: { taskId: number }) {
                   <StepCheckbox
                     step={step}
                     checked={stepToggle.isChecked(step)}
-                    onCheckedChange={(value) => stepToggle.toggleStep(step.id, value)}
-                    onEdit={() => editor.editStep(step)}
+                    onCheckedChange={(value) => stepToggle.toggleStep(step, value, task)}
+                    onEdit={() => editor.editStep(step, task)}
                   />
                 </li>
               ))}

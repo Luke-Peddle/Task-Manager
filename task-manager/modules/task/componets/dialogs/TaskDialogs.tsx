@@ -2,15 +2,12 @@
 
 import type { TaskEditor } from "../../hooks/useTaskEditor";
 import { CompleteTaskDialog } from "./CompleteTaskDialog";
+import { ReopenTaskDialog } from "./ReopenTaskDialog";
 import { EditStepDialog } from "./StepDialog";
 import { TaskFormDialog } from "./TaskFormDialog";
 
-interface TaskDialogsProps {
-  editor: TaskEditor;
-}
-
-export function TaskDialogs(props: TaskDialogsProps) {
-  const { completion, dialogs } = props.editor;
+export function TaskDialogs({ editor }: { editor: TaskEditor }) {
+  const { completion, stepToggle, dialogs } = editor;
   const closeOnDismiss = (open: boolean) => {
     if (!open) dialogs.close();
   };
@@ -34,6 +31,12 @@ export function TaskDialogs(props: TaskDialogsProps) {
         open={dialogs.open === "step"}
         onOpenChange={closeOnDismiss}
         step={dialogs.step}
+        taskDueDate={dialogs.stepTaskDueDate}
+      />
+      <ReopenTaskDialog
+        confirming={stepToggle.confirming}
+        onConfirm={stepToggle.confirmReopen}
+        onCancel={stepToggle.cancelReopen}
       />
     </>
   );

@@ -2,23 +2,40 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ifProvided, toDate } from '../common/utils.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UpdateStepDto } from './dto/update-step.dto.js';
+import { assertStepsWithinTaskDueDate } from './utils/steps.helpers.js';
 
 @Injectable()
 export class StepsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async update(id: number, dto: UpdateStepDto) {
-    const step = await this.prisma.step.findUnique({ where: { id } });
+    const step = await this.prisma.step.findUnique({ where: { id }, include: { task: true } });
     if (!step) throw new NotFoundException(`Step ${id} doesn't exist.`);
 
-    return this.prisma.step.update({
+    const dueDate = ifProvided(dto.dueDate, toDate);
+    assertStepsWithinTaskDueDate(
+      [{ name: dto.name ?? step.name, dueDate: dueDate === undefined ? step.dueDate : dueDate }],
+      step.task.dueDate,
+    );
+
+    const updateStep = this.prisma.step.update({
       where: { id },
       data: {
         completed: dto.completed,
         name: dto.name,
         description: ifProvided(dto.description, (value) => value || null),
-        dueDate: ifProvided(dto.dueDate, toDate),
+        dueDate,
       },
     });
+
+    if (dto.completed === false && step.task.completed) {
+      const [updated] = await this.prisma.$transaction([
+        updateStep,
+        this.prisma.task.update({ where: { id: step.taskId }, data: { completed: false } }),
+      ]);
+      return updated;
+    }
+
+    return updateStep;
   }
 }

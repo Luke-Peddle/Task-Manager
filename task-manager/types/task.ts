@@ -27,8 +27,14 @@ export interface CalendarTask extends Task {
   dueDate: string;
 }
 
+export interface StepParent {
+  name: string;
+  dueDate: string | null;
+  completed: boolean;
+}
+
 export interface CalendarStep extends Step {
-  task: { id: number; name: string };
+  task: { id: number; name: string; dueDate: string | null; completed: boolean };
 }
 
 export interface CalendarData {
@@ -59,4 +65,15 @@ export interface Milestone {
   label: string;
   done: boolean;
   overdue: boolean;
+}
+
+export interface StepDraft extends StepFormFields {
+  key: number;
+  id?: number;
+}
+
+export interface TaskFormFields {
+  name: string;
+  description: string;
+  dueDate: string;
 }

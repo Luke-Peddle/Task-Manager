@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ifProvided, toDate } from '../common/utils.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { STEP_ORDER, stepData } from '../steps/utils/steps.helpers.js';
+import { STEP_ORDER, assertStepsWithinTaskDueDate, stepData } from '../steps/utils/steps.helpers.js';
 import { CreateTaskDto } from './dto/create-task.dto.js';
 import { UpdateTaskDto } from './dto/update-task.dto.js';
 
@@ -34,7 +34,7 @@ export class TasksService {
       this.prisma.step.findMany({
         where: { dueDate: { gte: from, lt: to } },
         orderBy: STEP_ORDER,
-        include: { task: { select: { id: true, name: true } } },
+        include: { task: { select: { id: true, name: true, dueDate: true, completed: true } } },
       }),
     ]);
 
@@ -42,12 +42,15 @@ export class TasksService {
   }
 
   create(dto: CreateTaskDto) {
+    const steps = (dto.steps ?? []).map(stepData);
+    assertStepsWithinTaskDueDate(steps, toDate(dto.dueDate));
+
     return this.prisma.task.create({
       data: {
         name: dto.name,
         description: dto.description || null,
         dueDate: toDate(dto.dueDate),
-        steps: { create: (dto.steps ?? []).map(stepData) },
+        steps: { create: steps },
       },
       include: WITH_STEPS,
     });
@@ -56,9 +59,15 @@ export class TasksService {
   async update(id: number, dto: UpdateTaskDto) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: { steps: { select: { id: true } } },
+      include: { steps: { select: { id: true, name: true, dueDate: true } } },
     });
     if (!task) throw new NotFoundException(`Task ${id} doesn't exist.`);
+
+    const dueDate = ifProvided(dto.dueDate, toDate);
+    assertStepsWithinTaskDueDate(
+      dto.steps ? dto.steps.map(stepData) : task.steps,
+      dueDate === undefined ? task.dueDate : dueDate,
+    );
 
     if (dto.steps) {
       const ownIds = new Set(task.steps.map((step) => step.id));
@@ -96,7 +105,7 @@ export class TasksService {
         data: {
           name: dto.name,
           description: ifProvided(dto.description, (value) => value || null),
-          dueDate: ifProvided(dto.dueDate, toDate),
+          dueDate,
           completed: dto.completed,
         },
         include: WITH_STEPS,

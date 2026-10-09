@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useTaskEditor } from "../../hooks/useTaskEditor";
 import { useTimeline } from "../../hooks/useTasks";
-import { groupTasks } from "../../lib/utils";
+import { groupTasks } from "../../lib/tasks";
 import type { Task } from "@/types/task";
 import { AddTask } from "../AddTask";
 import { TaskDialogs } from "../dialogs/TaskDialogs";

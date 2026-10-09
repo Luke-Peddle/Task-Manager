@@ -19,7 +19,7 @@ import {
   groupByDateKey,
   startOfMonth,
   toDateKey,
-} from "../../lib/utils";
+} from "@/lib/dates";
 import { TaskDialogs } from "../dialogs/TaskDialogs";
 import { CalendarDay } from "./CalendarDay";
 
@@ -52,9 +52,9 @@ export function TaskCalendar({ taskId }: TaskCalendarProps) {
       setOpenKey(null);
       editor.editTask(task);
     },
-    editStep: (step: Parameters<typeof editor.editStep>[0]) => {
+    editStep: (...args: Parameters<typeof editor.editStep>) => {
       setOpenKey(null);
-      editor.editStep(step);
+      editor.editStep(...args);
     },
   };
 

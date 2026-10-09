@@ -3,7 +3,7 @@
 import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatShortDate } from "../lib/utils";
+import { formatShortDate } from "@/lib/dates";
 import type { Step } from "@/types/task";
 
 interface StepCheckboxProps {

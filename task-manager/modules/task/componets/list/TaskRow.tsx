@@ -8,13 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { TaskEditor } from "../../hooks/useTaskEditor";
-import {
-  formatRelative,
-  formatShortDate,
-  getStepProgress,
-  getTaskStatus,
-  getTaskSummary,
-} from "../../lib/utils";
+import { getStepProgress, getTaskStatus, getTaskSummary } from "../../lib/tasks";
+import { formatShortDate, formatRelative } from "@/lib/dates";
 import type { Task } from "@/types/task";
 import { StepCheckbox } from "../StepCheckbox";
 
@@ -124,8 +119,8 @@ export function TaskRow({ task, editor }: { task: Task; editor: TaskEditor }) {
                   <StepCheckbox
                     step={step}
                     checked={stepToggle.isChecked(step)}
-                    onCheckedChange={(value) => stepToggle.toggleStep(step.id, value)}
-                    onEdit={() => editor.editStep(step)}
+                    onCheckedChange={(value) => stepToggle.toggleStep(step, value, task)}
+                    onEdit={() => editor.editStep(step, task)}
                   />
                 </li>
               ))}
